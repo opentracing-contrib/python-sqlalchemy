@@ -1,4 +1,4 @@
-from sqlalchemy.event import listen
+from sqlalchemy.event import listen, remove
 
 g_tracer = None
 
@@ -43,6 +43,15 @@ def register_connectable(obj):
     listen(obj, 'before_cursor_execute', _before_cursor_handler)
     listen(obj, 'after_cursor_execute', _after_cursor_handler)
     listen(obj, 'handle_error', _error_handler)
+
+def unregister_connectable(obj):
+    '''
+    Remove a connectable from having its events being
+    traced.
+    '''
+    remove(obj, 'before_cursor_execute', _before_cursor_handler)
+    remove(obj, 'after_cursor_execute', _after_cursor_handler)
+    remove(obj, 'handle_error', _error_handler)
 
 def _get_operation_name(stmt_obj):
     return stmt_obj.__visit_name__
