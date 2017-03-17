@@ -1,25 +1,48 @@
 from sqlalchemy.event import listen, remove
 
 g_tracer = None
+g_trace_all = True
 
-def init_tracing(tracer):
+def init_tracing(tracer, trace_all=False):
     '''
     Set our global tracer.
     Tracer objects from our pyramid/flask/django libraries
     can be passed as well.
     '''
-    global g_tracer
+    global g_tracer, g_trace_all
     if hasattr(tracer, '_tracer'):
         g_tracer = tracer._tracer
     else:
         g_tracer = tracer
 
+    g_trace_all = trace_all
+
+def get_traced(stmt_obj):
+    '''
+    Gets a bool indicating whether or not this
+    statement is marked for tracing.
+    '''
+    return getattr(stmt_obj, '_traced', False)
+
+def set_traced(stmt_obj):
+    '''
+    Mark a statement to be traced.
+    '''
+    stmt_obj._traced = True
+
+def get_parent_span(stmt_obj):
+    '''
+    Gets a parent span for this statement, if any.
+    '''
+    return getattr(stmt_obj, '_parent_span', None)
+
 def set_parent_span(stmt_obj, parent_span):
     '''
-    Start tracing a given statement under
-    a specific span.
+    Marks a statement as a child of a span.
+    It gets marked to be traced if it wasn't before.
     '''
     stmt_obj._parent_span = parent_span
+    stmt_obj._traced = True
 
 def has_parent_span(stmt_obj):
     '''
@@ -63,13 +86,16 @@ def _before_cursor_handler(conn, cursor, statement, parameters, context, execute
     if context.compiled is None: # PRAGMA
         return
 
+    # Don't trace if trace_all is disabled and the statement wasn't marked
     stmt_obj = context.compiled.statement
-    parent_span = getattr(stmt_obj, '_parent_span', None)
+    if not (g_trace_all or get_traced(stmt_obj)):
+        return
+
+    parent_span = get_parent_span(stmt_obj)
     operation_name = _get_operation_name(stmt_obj)
 
     # Start a new span for this query.
     span = g_tracer.start_span(operation_name=operation_name, child_of=parent_span)
-
     span.set_tag('component', 'sqlalchemy')
     span.set_tag('db.type', 'sql')
     span.set_tag('db.statement', _normalize_stmt(statement))
