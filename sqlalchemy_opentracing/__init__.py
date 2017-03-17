@@ -1,11 +1,8 @@
 from sqlalchemy.event import listen
-from sqlalchemy.engine import Connectable
-
-import opentracing
 
 g_tracer = None
 
-def set_tracer(tracer):
+def init_tracing(tracer):
     '''
     Set our global tracer.
     Tracer objects from our pyramid/flask/django libraries
@@ -17,42 +14,77 @@ def set_tracer(tracer):
     else:
         g_tracer = tracer
 
-def set_parent_span(stmt, parent_span):
+def set_parent_span(stmt_obj, parent_span):
     '''
     Start tracing a given statement under
     a specific span.
     '''
-    stmt._parent_span = parent_span
+    stmt_obj._parent_span = parent_span
 
-def has_parent_span(stmt):
+def has_parent_span(stmt_obj):
     '''
     Get whether or not the statement has
     a parent span.
     '''
-    return hasattr(stmt, '_parent_span')
+    return hasattr(stmt_obj, '_parent_span')
 
-def _before_handler(conn, clauseelement, multiparams, params):
-    parent_span = getattr(clauseelement, '_parent_span', None)
-    span = tracer.start_span(operation_name='sql?', child_of=parent_span) # (xxx) operation name
+def get_span(stmt_obj):
+    '''
+    Get the span of a statement object, if any.
+    '''
+    return getattr(stmt_obj, '_span', None)
 
-    clauseelement._span = span
-
-def _after_handler(conn, clauseelement, multiparams, params):
-    if getattr(clauseelement, '_span', None) is None:
-        return
-
-    span = clauseelement._span
-    span.finish()
-
-def register_tracing(obj):
+def register_connectable(obj):
     '''
     Register an object to have its events be traced.
+    Any Connectable object is accepted, which
+    includes Connection and Engine.
     '''
-    if isinstance(obj, Connectable): # Engine or Connection instance.
-        listen(obj, 'before_cursor_execute', _before_cursor_handler)
-        listen(obj, 'after_cursor_execute', _after_cursor_handler)
+    listen(obj, 'before_cursor_execute', _before_cursor_handler)
+    listen(obj, 'after_cursor_execute', _after_cursor_handler)
+    listen(obj, 'handle_error', _error_handler)
 
-    #elif isinstance(obj, MetaData): # Schema changes
-    #    listen(obj, "before_create", _schema_before_handler)
-    #    listen(obj, "after_create", _schema_after_handler)
+def _get_operation_name(stmt_obj):
+    return stmt_obj.__visit_name__
+
+def _normalize_stmt(statement):
+    return statement.strip().replace('\n', '').replace('\t', '')
+
+def _before_cursor_handler(conn, cursor, statement, parameters, context, executemany):
+    if context.compiled is None: # PRAGMA
+        return
+
+    stmt_obj = context.compiled.statement
+    parent_span = getattr(stmt_obj, '_parent_span', None)
+    operation_name = _get_operation_name(stmt_obj)
+
+    # Start a new span for this query.
+    span = g_tracer.start_span(operation_name=operation_name, child_of=parent_span)
+
+    span.set_tag('component', 'sqlalchemy')
+    span.set_tag('db.type', 'sql')
+    span.set_tag('db.statement', _normalize_stmt(statement))
+
+    stmt_obj._span = span
+
+def _after_cursor_handler(conn, cursor, statement, parameters, context, executemany):
+    if context.compiled is None: # PRAGMA
+        return
+
+    stmt_obj = context.compiled.statement
+    span = get_span(stmt_obj)
+    if span is None:
+        return
+
+    span.finish()
+
+def _error_handler(exception_context):
+    execution_context = exception_context.execution_context
+    stmt_obj = execution_context.compiled.statement
+    span = get_span(stmt_obj)
+    if span is None:
+        return
+
+    span.set_tag('error', 'true')
+    span.finish()
 
