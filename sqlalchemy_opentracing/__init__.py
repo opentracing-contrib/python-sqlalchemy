@@ -1,4 +1,4 @@
-from sqlalchemy.event import listen, remove
+from sqlalchemy.event import contains, listen, remove
 from sqlalchemy.orm import Session
 
 g_tracer = None
@@ -171,27 +171,34 @@ def _connectable_error_handler(exception_context):
     span.finish()
 
 def _register_session_connection_event(session):
-    listen(session, 'after_begin', _session_after_begin_handler)
+    '''
+    Register connection/transaction and clean up events
+    for our session only once, as adding/removing them
+    seems an expensive operation.
+    '''
 
-def _session_after_begin_handler(session, transaction, conn):
+    # Use 'after_being' as a mark to guess the events being handled.
+    if contains(session, 'after_begin', _session_after_begin_handler):
+        return
+
     # Have the connections inherit the tracing info
     # from the session (including parent span, if any).
-    _set_traced_with_session(conn, session)
+    listen(session, 'after_begin', _session_after_begin_handler)
 
     # Plug post-operation clean up handlers.
     # The actual session commit/rollback is not traced by us.
-    listen(session, 'before_commit', _session_before_commit_handler, once=True)
-    listen(session, 'after_rollback', _session_rollback_handler, once=True)
+    listen(session, 'after_commit', _session_before_commit_handler)
+    listen(session, 'after_rollback', _session_rollback_handler)
 
-# Event handlers can't remove themselves
-# Fine, as long as we only fire one of them *once*.
+def _session_after_begin_handler(session, transaction, conn):
+    # It's only needed to pass down tracing information
+    # if it was explicitly set.
+    if get_traced(session):
+        _set_traced_with_session(conn, session)
+
 def _session_before_commit_handler(session):
     _clear_traced(session)
-    remove(session, 'after_begin', _session_after_begin_handler)
-    remove(session, 'after_rollback', _session_rollback_handler)
 
 def _session_rollback_handler(session):
     _clear_traced(session)
-    remove(session, 'after_begin', _session_after_begin_handler)
-    remove(session, 'before_commit', _session_before_commit_handler)
 
