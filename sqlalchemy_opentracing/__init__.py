@@ -57,12 +57,6 @@ def has_parent_span(obj):
     '''
     return hasattr(obj, '_parent_span')
 
-def get_span(obj):
-    '''
-    Get the span of a statement object, if any.
-    '''
-    return getattr(obj, '_span', None)
-
 def register_connectable(obj):
     '''
     Register an object to have its events be traced.
@@ -104,6 +98,12 @@ def _clear_traced(obj):
         del obj._parent_span
     if hasattr(obj, '_traced'):
         del obj._traced
+
+def _get_span(obj):
+    '''
+    Get the span of a statement object, if any.
+    '''
+    return getattr(obj, '_span', None)
 
 def _set_traced_with_session(conn, session):
     '''
@@ -154,7 +154,7 @@ def _connectable_after_cursor_handler(conn, cursor,
         return
 
     stmt_obj = context.compiled.statement
-    span = get_span(stmt_obj)
+    span = _get_span(stmt_obj)
     if span is None:
         return
 
@@ -163,7 +163,7 @@ def _connectable_after_cursor_handler(conn, cursor,
 def _connectable_error_handler(exception_context):
     execution_context = exception_context.execution_context
     stmt_obj = execution_context.compiled.statement
-    span = get_span(stmt_obj)
+    span = _get_span(stmt_obj)
     if span is None:
         return
 
