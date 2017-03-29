@@ -21,7 +21,7 @@ if __name__ == '__main__':
     conn = engine.connect()
 
     sqlalchemy_opentracing.init_tracing(tracer)
-    sqlalchemy_opentracing.register_connectable(engine)
+    sqlalchemy_opentracing.register_engine(engine)
 
     span = tracer.start_span('create sample')
 

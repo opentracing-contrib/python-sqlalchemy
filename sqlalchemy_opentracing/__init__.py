@@ -72,24 +72,21 @@ def has_parent_span(obj):
     '''
     return hasattr(obj, '_parent_span')
 
-def register_connectable(obj):
+def register_engine(obj):
     '''
-    Register an object to have its events be traced.
-    Any Connectable object is accepted, which
-    includes Connection and Engine.
+    Register an engine to have its events be traced.
     '''
-    listen(obj, 'before_cursor_execute', _connectable_before_cursor_handler)
-    listen(obj, 'after_cursor_execute', _connectable_after_cursor_handler)
-    listen(obj, 'handle_error', _connectable_error_handler)
+    listen(obj, 'before_cursor_execute', _engine_before_cursor_handler)
+    listen(obj, 'after_cursor_execute', _engine_after_cursor_handler)
+    listen(obj, 'handle_error', _engine_error_handler)
 
-def unregister_connectable(obj):
+def unregister_engine(obj):
     '''
-    Remove a connectable from having its events being
-    traced.
+    Remove an engine from having its events being traced.
     '''
-    remove(obj, 'before_cursor_execute', _connectable_before_cursor_handler)
-    remove(obj, 'after_cursor_execute', _connectable_after_cursor_handler)
-    remove(obj, 'handle_error', _connectable_error_handler)
+    remove(obj, 'before_cursor_execute', _engine_before_cursor_handler)
+    remove(obj, 'after_cursor_execute', _engine_after_cursor_handler)
+    remove(obj, 'handle_error', _engine_error_handler)
 
 def _can_operation_be_traced(conn, stmt_obj):
     '''
@@ -125,7 +122,7 @@ def _get_operation_name(stmt_obj):
 def _normalize_stmt(statement):
     return statement.strip().replace('\n', '').replace('\t', '')
 
-def _connectable_before_cursor_handler(conn, cursor,
+def _engine_before_cursor_handler(conn, cursor,
                                        statement, parameters,
                                        context, executemany):
     if context.compiled is None: # PRAGMA
@@ -153,7 +150,7 @@ def _connectable_before_cursor_handler(conn, cursor,
 
     stmt_obj._span = span
 
-def _connectable_after_cursor_handler(conn, cursor,
+def _engine_after_cursor_handler(conn, cursor,
                                       statement, parameters,
                                       context, executemany):
     if context.compiled is None: # PRAGMA
@@ -166,7 +163,7 @@ def _connectable_after_cursor_handler(conn, cursor,
 
     span.finish()
 
-def _connectable_error_handler(exception_context):
+def _engine_error_handler(exception_context):
     execution_context = exception_context.execution_context
     stmt_obj = execution_context.compiled.statement
     span = _get_span(stmt_obj)

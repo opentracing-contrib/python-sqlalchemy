@@ -29,7 +29,7 @@ if __name__ == '__main__':
     session = sessionmaker(bind=engine)()
 
     sqlalchemy_opentracing.init_tracing(tracer)
-    sqlalchemy_opentracing.register_connectable(engine)
+    sqlalchemy_opentracing.register_engine(engine)
 
     User.metadata.create_all(engine)
 

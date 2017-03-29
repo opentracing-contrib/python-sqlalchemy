@@ -14,7 +14,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
             Column('id', Integer, primary_key=True),
             Column('name', String),
         )
-        sqlalchemy_opentracing.register_connectable(self.engine)
+        sqlalchemy_opentracing.register_engine(self.engine)
 
     def test_traced(self):
         tracer = DummyTracer()
@@ -193,7 +193,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
         self.assertEqual(1, len(tracer.spans))
         self.assertEqual('create_table', tracer.spans[0].operation_name)
 
-    def test_unregister_connectable(self):
+    def test_unregister_engine(self):
         tracer = DummyTracer()
         creat = CreateTable(self.users_table)
 
@@ -202,7 +202,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
         self.assertEqual(1, len(tracer.spans))
 
         tracer.clear()
-        sqlalchemy_opentracing.unregister_connectable(self.engine)
+        sqlalchemy_opentracing.unregister_engine(self.engine)
 
         # Further events should cause no spans at all.
         sel = select([self.users_table])

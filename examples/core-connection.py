@@ -13,7 +13,7 @@ if __name__ == '__main__':
     engine = create_engine('sqlite:///:memory:')
 
     sqlalchemy_opentracing.init_tracing(tracer)
-    sqlalchemy_opentracing.register_connectable(engine)
+    sqlalchemy_opentracing.register_engine(engine)
 
     metadata = MetaData()
     users = Table('users', metadata,

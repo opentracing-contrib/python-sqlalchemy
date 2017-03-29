@@ -21,7 +21,7 @@ class TestSQLAlchemyORM(unittest.TestCase):
         self.session = sessionmaker(bind=self.engine)()
         User.metadata.create_all(self.engine)
 
-        sqlalchemy_opentracing.register_connectable(self.engine)
+        sqlalchemy_opentracing.register_engine(self.engine)
 
     def test_traced_simple(self):
         tracer = DummyTracer()
