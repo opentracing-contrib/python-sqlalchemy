@@ -149,6 +149,7 @@ def _connectable_before_cursor_handler(conn, cursor,
     span.set_tag('component', 'sqlalchemy')
     span.set_tag('db.type', 'sql')
     span.set_tag('db.statement', _normalize_stmt(statement))
+    span.set_tag('sqlalchemy.dialect', context.dialect.name)
 
     stmt_obj._span = span
 

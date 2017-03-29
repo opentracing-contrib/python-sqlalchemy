@@ -39,6 +39,7 @@ class TestSQLAlchemyORM(unittest.TestCase):
             'component': 'sqlalchemy',
             'db.statement': 'INSERT INTO users (name) VALUES (?)',
             'db.type': 'sql',
+            'sqlalchemy.dialect': 'sqlite',
         })
 
     def test_traced_none(self):
@@ -91,6 +92,7 @@ class TestSQLAlchemyORM(unittest.TestCase):
             'component': 'sqlalchemy',
             'db.statement': 'INSERT INTO users (id, name) VALUES (?, ?)',
             'db.type': 'sql',
+            'sqlalchemy.dialect': 'sqlite',
             'error': 'true',
         })
 
@@ -211,5 +213,6 @@ class TestSQLAlchemyORM(unittest.TestCase):
             'component': 'sqlalchemy',
             'db.statement': 'INSERT INTO users (name) VALUES (?)',
             'db.type': 'sql',
+            'sqlalchemy.dialect': 'sqlite',
         })
 

@@ -31,6 +31,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
             'component': 'sqlalchemy',
             'db.statement': 'CREATE TABLE users (id INTEGER NOT NULL, name VARCHAR, PRIMARY KEY (id))',
             'db.type': 'sql',
+            'sqlalchemy.dialect': 'sqlite',
         })
 
     def test_traced_none(self):
@@ -71,6 +72,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
             'component': 'sqlalchemy',
             'db.statement': 'CREATE TABLE users (id INTEGER NOT NULL, name VARCHAR, PRIMARY KEY (id))',
             'db.type': 'sql',
+            'sqlalchemy.dialect': 'sqlite',
             'error': 'true',
         })
 
