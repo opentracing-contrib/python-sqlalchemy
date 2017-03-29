@@ -216,3 +216,18 @@ class TestSQLAlchemyORM(unittest.TestCase):
             'sqlalchemy.dialect': 'sqlite',
         })
 
+    def test_traced_clear_session(self):
+        tracer = DummyTracer()
+        sqlalchemy_opentracing.init_tracing(tracer)
+
+        session = self.session
+        sqlalchemy_opentracing.set_traced(session)
+        session.add(User(name='John Doe'))
+        session.add(User(name='Jason Bourne'))
+
+        # Clear the tracing info right before committing.
+        sqlalchemy_opentracing.clear_traced(session)
+        session.commit()
+
+        self.assertEqual(0, len(tracer.spans))
+

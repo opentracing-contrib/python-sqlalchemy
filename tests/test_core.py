@@ -173,6 +173,26 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
         self.assertEqual(0, len(tracer.spans))
 
+    def test_traced_clear_connection(self):
+        tracer = DummyTracer()
+        creat = CreateTable(self.users_table)
+        ins = self.users_table.insert().values(name='John Doe')
+
+        sqlalchemy_opentracing.init_tracing(tracer)
+
+        conn = self.engine.connect()
+        with conn.begin() as tx:
+            sqlalchemy_opentracing.set_traced(conn)
+            conn.execute(creat)
+
+            # Stop tracing from this point.
+            sqlalchemy_opentracing.clear_traced(conn)
+
+            conn.execute(ins)
+
+        self.assertEqual(1, len(tracer.spans))
+        self.assertEqual('create_table', tracer.spans[0].operation_name)
+
     def test_unregister_connectable(self):
         tracer = DummyTracer()
         creat = CreateTable(self.users_table)

@@ -41,6 +41,16 @@ def set_traced(obj):
         # after commit/rollback.
         _register_connection_events(obj)
 
+def clear_traced(obj):
+    '''
+    Clear an object's decorated tracing fields,
+    to prevent unintended further tracing.
+    '''
+    if hasattr(obj, '_parent_span'):
+        del obj._parent_span
+    if hasattr(obj, '_traced'):
+        del obj._traced
+
 def get_parent_span(obj):
     '''
     Gets a parent span for this object, if any.
@@ -93,16 +103,6 @@ def _can_operation_be_traced(conn, stmt_obj):
         return conn._traced
 
     return False
-
-def _clear_traced(obj):
-    '''
-    Clear an object's decorated tracing fields,
-    to prevent unintended further tracing.
-    '''
-    if hasattr(obj, '_parent_span'):
-        del obj._parent_span
-    if hasattr(obj, '_traced'):
-        del obj._traced
 
 def _get_span(obj):
     '''
@@ -212,7 +212,7 @@ def _register_session_connection_event(session):
     listen(session, 'after_rollback', _session_rollback_handler)
 
 def _connection_cleanup_handler(conn):
-    _clear_traced(conn)
+    clear_traced(conn)
 
 def _session_after_begin_handler(session, transaction, conn):
     # It's only needed to pass down tracing information
@@ -221,8 +221,8 @@ def _session_after_begin_handler(session, transaction, conn):
         _set_traced_with_session(conn, session)
 
 def _session_before_commit_handler(session):
-    _clear_traced(session)
+    clear_traced(session)
 
 def _session_rollback_handler(session):
-    _clear_traced(session)
+    clear_traced(session)
 
