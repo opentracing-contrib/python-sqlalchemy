@@ -1,3 +1,4 @@
+from sqlalchemy.engine import Connection
 from sqlalchemy.event import contains, listen, remove
 from sqlalchemy.orm import Session
 
@@ -31,10 +32,14 @@ def set_traced(obj):
     '''
     obj._traced = True
 
-    # Session needs to have its connection/statements
-    # decorated as soon as a connection is acquired.
     if isinstance(obj, Session):
+        # Session needs to have its connection/statements
+        # decorated as soon as a connection is acquired.
         _register_session_connection_event(obj)
+    elif isinstance(obj, Connection):
+        # Connection simply needs to be cleaned up
+        # after commit/rollback.
+        _register_connection_events(obj)
 
 def get_parent_span(obj):
     '''
@@ -170,6 +175,21 @@ def _connectable_error_handler(exception_context):
     span.set_tag('error', 'true')
     span.finish()
 
+def _register_connection_events(conn):
+    '''
+    Register clean up events for our
+    connection only once, as adding/removing them
+    seems an expensive operation.
+    '''
+
+    # Use 'commit' as a mark to guess the events being handled.
+    if contains(conn, 'commit', _connection_cleanup_handler):
+        return
+
+    # Plug post-operation clean up handlers.
+    listen(conn, 'commit', _connection_cleanup_handler)
+    listen(conn, 'rollback', _connection_cleanup_handler)
+
 def _register_session_connection_event(session):
     '''
     Register connection/transaction and clean up events
@@ -189,6 +209,9 @@ def _register_session_connection_event(session):
     # The actual session commit/rollback is not traced by us.
     listen(session, 'after_commit', _session_before_commit_handler)
     listen(session, 'after_rollback', _session_rollback_handler)
+
+def _connection_cleanup_handler(conn):
+    _clear_traced(conn)
 
 def _session_after_begin_handler(session, transaction, conn):
     # It's only needed to pass down tracing information
