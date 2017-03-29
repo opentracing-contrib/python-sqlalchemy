@@ -93,6 +93,7 @@ class TestSQLAlchemyORM(unittest.TestCase):
             'db.statement': 'INSERT INTO users (id, name) VALUES (?, ?)',
             'db.type': 'sql',
             'sqlalchemy.dialect': 'sqlite',
+            'sqlalchemy.exception': 'UNIQUE constraint failed: users.id',
             'error': 'true',
         })
 

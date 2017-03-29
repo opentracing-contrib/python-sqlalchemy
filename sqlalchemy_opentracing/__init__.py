@@ -171,6 +171,8 @@ def _engine_error_handler(exception_context):
     if span is None:
         return
 
+    exc = exception_context.original_exception
+    span.set_tag('sqlalchemy.exception', str(exc))
     span.set_tag('error', 'true')
     span.finish()
 

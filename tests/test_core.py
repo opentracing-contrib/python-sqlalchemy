@@ -74,6 +74,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
             'db.statement': 'CREATE TABLE users (id INTEGER NOT NULL, name VARCHAR, PRIMARY KEY (id))',
             'db.type': 'sql',
             'sqlalchemy.dialect': 'sqlite',
+            'sqlalchemy.exception': 'table users already exists',
             'error': 'true',
         })
 
