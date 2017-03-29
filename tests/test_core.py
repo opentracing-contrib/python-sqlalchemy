@@ -33,6 +33,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
             'db.type': 'sql',
             'sqlalchemy.dialect': 'sqlite',
         })
+        self.assertEqual(False, sqlalchemy_opentracing.get_traced(creat))
 
     def test_traced_none(self):
         tracer = DummyTracer()

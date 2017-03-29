@@ -162,6 +162,7 @@ def _engine_after_cursor_handler(conn, cursor,
         return
 
     span.finish()
+    clear_traced(stmt_obj)
 
 def _engine_error_handler(exception_context):
     execution_context = exception_context.execution_context
