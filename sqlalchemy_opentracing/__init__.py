@@ -101,12 +101,6 @@ def _can_operation_be_traced(conn, stmt_obj):
 
     return False
 
-def _get_span(obj):
-    '''
-    Get the span of a statement object, if any.
-    '''
-    return getattr(obj, '_span', None)
-
 def _set_traced_with_session(conn, session):
     '''
     Mark a connection to be traced with a session tracing information.
@@ -117,6 +111,11 @@ def _set_traced_with_session(conn, session):
         conn._parent_span = parent_span
 
 def _get_operation_name(stmt_obj):
+    if stmt_obj is None:
+        # Match what the ORM shows when raw SQL
+        # statements are invoked.
+        return 'textclause'
+
     return stmt_obj.__visit_name__
 
 def _normalize_stmt(statement):
@@ -125,13 +124,17 @@ def _normalize_stmt(statement):
 def _engine_before_cursor_handler(conn, cursor,
                                        statement, parameters,
                                        context, executemany):
-    if context.compiled is None: # PRAGMA
-        return
+    stmt_obj = None
+    if context.compiled is not None:
+        stmt_obj = context.compiled.statement
 
     # Don't trace if trace_all is disabled
     # and the connection/statement wasn't marked explicitly.
-    stmt_obj = context.compiled.statement
     if not (g_trace_all or _can_operation_be_traced(conn, stmt_obj)):
+        return
+
+    # Don't trace PRAGMA statements coming from SQLite
+    if stmt_obj is None and statement.startswith('PRAGMA'):
         return
 
     # Retrieve the parent span, if any,
@@ -148,26 +151,23 @@ def _engine_before_cursor_handler(conn, cursor,
     span.set_tag('db.statement', _normalize_stmt(statement))
     span.set_tag('sqlalchemy.dialect', context.dialect.name)
 
-    stmt_obj._span = span
+    context._span = span
 
 def _engine_after_cursor_handler(conn, cursor,
                                       statement, parameters,
                                       context, executemany):
-    if context.compiled is None: # PRAGMA
-        return
-
-    stmt_obj = context.compiled.statement
-    span = _get_span(stmt_obj)
+    span = getattr(context, '_span', None)
     if span is None:
         return
 
     span.finish()
-    clear_traced(stmt_obj)
+
+    if context.compiled is not None:
+        clear_traced(context.compiled.statement)
 
 def _engine_error_handler(exception_context):
     execution_context = exception_context.execution_context
-    stmt_obj = execution_context.compiled.statement
-    span = _get_span(stmt_obj)
+    span = getattr(execution_context, '_span', None)
     if span is None:
         return
 

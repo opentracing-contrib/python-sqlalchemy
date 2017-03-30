@@ -78,6 +78,44 @@ class TestSQLAlchemyCore(unittest.TestCase):
             'error': 'true',
         })
 
+    def test_trace_text(self):
+        tracer = DummyTracer()
+        creat = CreateTable(self.users_table)
+        self.engine.execute(creat)
+
+        sqlalchemy_opentracing.init_tracing(tracer, trace_all=True)
+        self.engine.execute('SELECT name FROM users')
+        self.assertEqual(1, len(tracer.spans))
+        self.assertEqual(tracer.spans[0].operation_name, 'textclause')
+        self.assertEqual(tracer.spans[0].is_finished, True)
+        self.assertEqual(tracer.spans[0].tags, {
+            'component': 'sqlalchemy',
+            'db.statement': 'SELECT name FROM users',
+            'db.type': 'sql',
+            'sqlalchemy.dialect': 'sqlite',
+        })
+
+    def test_trace_text_error(self):
+        tracer = DummyTracer()
+
+        sqlalchemy_opentracing.init_tracing(tracer, trace_all=True)
+        try:
+            self.engine.execute('SELECT name FROM users')
+        except OperationalError:
+            pass
+
+        self.assertEqual(1, len(tracer.spans))
+        self.assertEqual(tracer.spans[0].operation_name, 'textclause')
+        self.assertEqual(tracer.spans[0].is_finished, True)
+        self.assertEqual(tracer.spans[0].tags, {
+            'component': 'sqlalchemy',
+            'db.statement': 'SELECT name FROM users',
+            'db.type': 'sql',
+            'sqlalchemy.dialect': 'sqlite',
+            'sqlalchemy.exception': 'no such table: users',
+            'error': 'true',
+        })
+
     def test_traced_transaction(self):
         tracer = DummyTracer()
         creat = CreateTable(self.users_table)

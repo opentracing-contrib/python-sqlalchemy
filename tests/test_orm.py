@@ -1,7 +1,7 @@
 import unittest
 from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import sessionmaker
 
 import sqlalchemy_opentracing
@@ -112,6 +112,51 @@ class TestSQLAlchemyORM(unittest.TestCase):
         self.assertEqual(True, all(map(lambda x: x.operation_name == 'select', tracer.spans)))
         self.assertEqual(True, all(map(lambda x: x.is_finished, tracer.spans)))
         self.assertEqual(True, all(map(lambda x: x.child_of == parent_span, tracer.spans)))
+
+    def test_traced_text(self):
+        tracer = DummyTracer()
+        sqlalchemy_opentracing.init_tracing(tracer)
+
+        session = self.session
+        span = DummySpan('parent span')
+        sqlalchemy_opentracing.set_parent_span(session, span)
+        session.execute('SELECT name FROM users')
+
+        self.assertEqual(1, len(tracer.spans))
+        self.assertEqual(tracer.spans[0].operation_name, 'textclause')
+        self.assertEqual(tracer.spans[0].is_finished, True)
+        self.assertEqual(tracer.spans[0].child_of, span)
+        self.assertEqual(tracer.spans[0].tags, {
+            'component': 'sqlalchemy',
+            'db.statement': 'SELECT name FROM users',
+            'db.type': 'sql',
+            'sqlalchemy.dialect': 'sqlite',
+        })
+
+    def test_traced_text_error(self):
+        tracer = DummyTracer()
+        sqlalchemy_opentracing.init_tracing(tracer)
+
+        session = self.session
+        span = DummySpan('parent span')
+        sqlalchemy_opentracing.set_parent_span(session, span)
+        try:
+            session.execute('SELECT zipcode FROM addresses')
+        except OperationalError:
+            pass
+
+        self.assertEqual(1, len(tracer.spans))
+        self.assertEqual(tracer.spans[0].operation_name, 'textclause')
+        self.assertEqual(tracer.spans[0].is_finished, True)
+        self.assertEqual(tracer.spans[0].child_of, span)
+        self.assertEqual(tracer.spans[0].tags, {
+            'component': 'sqlalchemy',
+            'db.statement': 'SELECT zipcode FROM addresses',
+            'db.type': 'sql',
+            'sqlalchemy.dialect': 'sqlite',
+            'sqlalchemy.exception': 'no such table: addresses',
+            'error': 'true',
+        })
 
     def test_traced_after_commit(self):
         tracer = DummyTracer()
