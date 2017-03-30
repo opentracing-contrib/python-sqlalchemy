@@ -35,7 +35,7 @@ def set_traced(obj):
     if isinstance(obj, Session):
         # Session needs to have its connection/statements
         # decorated as soon as a connection is acquired.
-        _register_session_connection_event(obj)
+        _register_session_events(obj)
     elif isinstance(obj, Connection):
         # Connection simply needs to be cleaned up
         # after commit/rollback.
@@ -191,7 +191,7 @@ def _register_connection_events(conn):
     listen(conn, 'commit', _connection_cleanup_handler)
     listen(conn, 'rollback', _connection_cleanup_handler)
 
-def _register_session_connection_event(session):
+def _register_session_events(session):
     '''
     Register connection/transaction and clean up events
     for our session only once, as adding/removing them
@@ -208,8 +208,8 @@ def _register_session_connection_event(session):
 
     # Plug post-operation clean up handlers.
     # The actual session commit/rollback is not traced by us.
-    listen(session, 'after_commit', _session_before_commit_handler)
-    listen(session, 'after_rollback', _session_rollback_handler)
+    listen(session, 'after_commit', _session_cleanup_handler)
+    listen(session, 'after_rollback', _session_cleanup_handler)
 
 def _connection_cleanup_handler(conn):
     clear_traced(conn)
@@ -220,9 +220,6 @@ def _session_after_begin_handler(session, transaction, conn):
     if get_traced(session):
         _set_traced_with_session(conn, session)
 
-def _session_before_commit_handler(session):
-    clear_traced(session)
-
-def _session_rollback_handler(session):
+def _session_cleanup_handler(session):
     clear_traced(session)
 
