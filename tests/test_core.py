@@ -137,6 +137,30 @@ class TestSQLAlchemyCore(unittest.TestCase):
         self.assertEqual(['create_table', 'insert', 'select'],
                          map(lambda x: x.operation_name, tracer.spans))
 
+    def test_traced_transaction_nested(self):
+        tracer = DummyTracer()
+        creat = CreateTable(self.users_table)
+        ins = self.users_table.insert().values(name='John Doe')
+        sel = select([self.users_table])
+
+        sqlalchemy_opentracing.init_tracing(tracer)
+        parent_span = DummySpan('parent span')
+        conn = self.engine.connect()
+
+        with conn.begin() as trans:
+            sqlalchemy_opentracing.set_parent_span(conn, parent_span)
+            conn.execute(creat)
+
+            with conn.begin() as trans2:
+                conn.execute(ins)
+                conn.execute(sel)
+
+        self.assertEqual(3, len(tracer.spans))
+        self.assertEqual(True, all(map(lambda x: x.is_finished, tracer.spans)))
+        self.assertEqual(True, all(map(lambda x: x.child_of == parent_span, tracer.spans)))
+        self.assertEqual(['create_table', 'insert', 'select'],
+                         map(lambda x: x.operation_name, tracer.spans))
+
     def test_traced_rollback(self):
         tracer = DummyTracer()
         creat = CreateTable(self.users_table)

@@ -55,13 +55,25 @@ It is possible to trace all statements being executed under a connection's trans
     with conn.begin() as trans:
         sqlalchemy_opentracing.set_parent_span(conn, parent_span)
 
-        # these three statements will be traced as child of
+        # these three statements will be traced as children of
         # parent_span
         conn.execute(users.insert().values(name='John'))
         conn.execute(users.insert().values(name='Jason'))
         conn.execute(users.insert().values(name='Jackie'))
 
-Either a commit or a rollback on a connection's transaction will finish its tracing. If the same Connection object is used afterwards, no tracing will be done for it (unless registered for tracing again).
+Either a commit or a rollback on a connection's transaction will finish its tracing. If the same Connection object is used afterwards, no tracing will be done for it (unless registered for tracing again). When using (emulated) nested transactions, the tracing needs to be marked at top-level transaction time, and tracing will happen for all statements under the nested transactions:
+
+.. code-block:: python
+
+    with conn.begin() as trans:
+        sqlalchemy_opentracing.set_parent_span(conn, parent_span)
+        conn.execute(users.insert().values(name='John'))
+
+        with conn.begin() as nested_trans:
+            # This statement will also be traced as
+            # child of parent_span
+            conn.execute(users.insert().values(name='Jason'))
+
 
 Tracing under a Session (ORM)
 =============================
