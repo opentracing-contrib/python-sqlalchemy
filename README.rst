@@ -40,6 +40,8 @@ By default, only statements marked to be traced are taken into account (explicit
         sel = select([users])
         conn.execute(sel)
 
+The resulting spans will have an operation name related to the sql statement (such as `create-table` or `insert`), and will include exception information (if any), the dialect/backend (such as sqlite), and a few other hints.
+
 Tracing under a Connection
 ===========================
 
@@ -79,6 +81,21 @@ It is also possible to trace all actual SQL statements happening during a Sessio
         session.rollback()
 
 Similar to what happens for Connection, either a commit or a rollback will finish its tracing, and further work on it will not be reported.
+
+Tracing raw SQL statements
+==========================
+
+Executing raw SQL statements can be done through either a Connection or a Session, through their execute() method. Since there's no way to mark each statement individually, tracing them can be done through either tracing all statements, or through tracing a Connection's transaction or Session:
+
+.. code-block:: python
+
+    sqlalchemy_opentracing.set_parent_span(session, parent_span)
+
+    # this statement will be traced as part of the session's execution
+    session.execute('INSERT INTO users VALUES (?, ?)', 1, 'John')
+
+
+Raw SQL statements will be traced having its operation name as `textclause`, to indicate their explicit text nature.
 
 Manually cancel tracing
 =======================
