@@ -5,7 +5,7 @@ import lightstep
 import sqlalchemy_opentracing
 
 tracer = lightstep.Tracer(
-    component_name='sqlalchemy-simple',
+    component_name='sqlalchemy-conn',
     access_token='{your_lightstep_token}'
 )
 
@@ -21,10 +21,13 @@ if __name__ == '__main__':
         Column('name', String),
     )
     creat = CreateTable(users)
-    sqlalchemy_opentracing.set_traced(creat)
+    ins = users.insert().values(name='John Doe')
 
+    # All statements during this transaction will be traced.
     with engine.begin() as conn:
+        sqlalchemy_opentracing.set_traced(conn)
         conn.execute(creat)
+        conn.execute(ins)
 
     tracer.flush()
 

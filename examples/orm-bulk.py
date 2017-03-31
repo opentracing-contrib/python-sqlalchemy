@@ -9,7 +9,7 @@ import sqlalchemy_opentracing
 DB_LOCATION = '/tmp/simple.db'
 
 tracer = lightstep.Tracer(
-    component_name='sqlalchemy-orm-simple',
+    component_name='sqlalchemy-orm-bulk',
     access_token='{your_lightstep_token}'
 )
 
@@ -36,10 +36,11 @@ if __name__ == '__main__':
     # Register the session for the current transaction.
     sqlalchemy_opentracing.set_traced(session)
 
-    # Insert a new row.
-    session.add(User(name='John Doe'))
+    # Insert a set of rows.
+    users = [User(name = 'User-%s' % i) for i in xrange(100)]
+    session.bulk_save_objects(users)
 
-    # Finish the commit.
-    # This will stop tracing the session.
-    session.commit()
+    # Bulk saves objects without intermmediate steps,
+    # so explicitly stop tracing the session.
+    sqlalchemy_opentracing.clear_traced(session)
 

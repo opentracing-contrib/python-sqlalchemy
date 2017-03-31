@@ -1,4 +1,5 @@
-from sqlalchemy.event import listen, remove
+from sqlalchemy.engine import Connection
+from sqlalchemy.event import contains, listen, remove
 from sqlalchemy.orm import Session
 
 g_tracer = None
@@ -31,10 +32,24 @@ def set_traced(obj):
     '''
     obj._traced = True
 
-    # Session needs to have its connection/statements
-    # decorated as soon as a connection is acquired.
     if isinstance(obj, Session):
-        _register_session_connection_event(obj)
+        # Session needs to have its connection/statements
+        # decorated as soon as a connection is acquired.
+        _register_session_events(obj)
+    elif isinstance(obj, Connection):
+        # Connection simply needs to be cleaned up
+        # after commit/rollback.
+        _register_connection_events(obj)
+
+def clear_traced(obj):
+    '''
+    Clear an object's decorated tracing fields,
+    to prevent unintended further tracing.
+    '''
+    if hasattr(obj, '_parent_span'):
+        del obj._parent_span
+    if hasattr(obj, '_traced'):
+        del obj._traced
 
 def get_parent_span(obj):
     '''
@@ -57,30 +72,21 @@ def has_parent_span(obj):
     '''
     return hasattr(obj, '_parent_span')
 
-def get_span(obj):
+def register_engine(obj):
     '''
-    Get the span of a statement object, if any.
+    Register an engine to have its events be traced.
     '''
-    return getattr(obj, '_span', None)
+    listen(obj, 'before_cursor_execute', _engine_before_cursor_handler)
+    listen(obj, 'after_cursor_execute', _engine_after_cursor_handler)
+    listen(obj, 'handle_error', _engine_error_handler)
 
-def register_connectable(obj):
+def unregister_engine(obj):
     '''
-    Register an object to have its events be traced.
-    Any Connectable object is accepted, which
-    includes Connection and Engine.
+    Remove an engine from having its events being traced.
     '''
-    listen(obj, 'before_cursor_execute', _connectable_before_cursor_handler)
-    listen(obj, 'after_cursor_execute', _connectable_after_cursor_handler)
-    listen(obj, 'handle_error', _connectable_error_handler)
-
-def unregister_connectable(obj):
-    '''
-    Remove a connectable from having its events being
-    traced.
-    '''
-    remove(obj, 'before_cursor_execute', _connectable_before_cursor_handler)
-    remove(obj, 'after_cursor_execute', _connectable_after_cursor_handler)
-    remove(obj, 'handle_error', _connectable_error_handler)
+    remove(obj, 'before_cursor_execute', _engine_before_cursor_handler)
+    remove(obj, 'after_cursor_execute', _engine_after_cursor_handler)
+    remove(obj, 'handle_error', _engine_error_handler)
 
 def _can_operation_be_traced(conn, stmt_obj):
     '''
@@ -95,16 +101,6 @@ def _can_operation_be_traced(conn, stmt_obj):
 
     return False
 
-def _clear_traced(obj):
-    '''
-    Clear an object's decorated tracing fields,
-    to prevent unintended further tracing.
-    '''
-    if hasattr(obj, '_parent_span'):
-        del obj._parent_span
-    if hasattr(obj, '_traced'):
-        del obj._traced
-
 def _set_traced_with_session(conn, session):
     '''
     Mark a connection to be traced with a session tracing information.
@@ -115,21 +111,30 @@ def _set_traced_with_session(conn, session):
         conn._parent_span = parent_span
 
 def _get_operation_name(stmt_obj):
+    if stmt_obj is None:
+        # Match what the ORM shows when raw SQL
+        # statements are invoked.
+        return 'textclause'
+
     return stmt_obj.__visit_name__
 
 def _normalize_stmt(statement):
     return statement.strip().replace('\n', '').replace('\t', '')
 
-def _connectable_before_cursor_handler(conn, cursor,
+def _engine_before_cursor_handler(conn, cursor,
                                        statement, parameters,
                                        context, executemany):
-    if context.compiled is None: # PRAGMA
-        return
+    stmt_obj = None
+    if context.compiled is not None:
+        stmt_obj = context.compiled.statement
 
     # Don't trace if trace_all is disabled
     # and the connection/statement wasn't marked explicitly.
-    stmt_obj = context.compiled.statement
     if not (g_trace_all or _can_operation_be_traced(conn, stmt_obj)):
+        return
+
+    # Don't trace PRAGMA statements coming from SQLite
+    if stmt_obj is None and statement.startswith('PRAGMA'):
         return
 
     # Retrieve the parent span, if any,
@@ -144,54 +149,80 @@ def _connectable_before_cursor_handler(conn, cursor,
     span.set_tag('component', 'sqlalchemy')
     span.set_tag('db.type', 'sql')
     span.set_tag('db.statement', _normalize_stmt(statement))
+    span.set_tag('sqlalchemy.dialect', context.dialect.name)
 
-    stmt_obj._span = span
+    context._span = span
 
-def _connectable_after_cursor_handler(conn, cursor,
+def _engine_after_cursor_handler(conn, cursor,
                                       statement, parameters,
                                       context, executemany):
-    if context.compiled is None: # PRAGMA
-        return
-
-    stmt_obj = context.compiled.statement
-    span = get_span(stmt_obj)
+    span = getattr(context, '_span', None)
     if span is None:
         return
 
     span.finish()
 
-def _connectable_error_handler(exception_context):
+    if context.compiled is not None:
+        clear_traced(context.compiled.statement)
+
+def _engine_error_handler(exception_context):
     execution_context = exception_context.execution_context
-    stmt_obj = execution_context.compiled.statement
-    span = get_span(stmt_obj)
+    span = getattr(execution_context, '_span', None)
     if span is None:
         return
 
+    exc = exception_context.original_exception
+    span.set_tag('sqlalchemy.exception', str(exc))
     span.set_tag('error', 'true')
     span.finish()
 
-def _register_session_connection_event(session):
-    listen(session, 'after_begin', _session_after_begin_handler)
+    if execution_context.compiled is not None:
+        clear_traced(execution_context.compiled.statement)
 
-def _session_after_begin_handler(session, transaction, conn):
+def _register_connection_events(conn):
+    '''
+    Register clean up events for our
+    connection only once, as adding/removing them
+    seems an expensive operation.
+    '''
+
+    # Use 'commit' as a mark to guess the events being handled.
+    if contains(conn, 'commit', _connection_cleanup_handler):
+        return
+
+    # Plug post-operation clean up handlers.
+    listen(conn, 'commit', _connection_cleanup_handler)
+    listen(conn, 'rollback', _connection_cleanup_handler)
+
+def _register_session_events(session):
+    '''
+    Register connection/transaction and clean up events
+    for our session only once, as adding/removing them
+    seems an expensive operation.
+    '''
+
+    # Use 'after_being' as a mark to guess the events being handled.
+    if contains(session, 'after_begin', _session_after_begin_handler):
+        return
+
     # Have the connections inherit the tracing info
     # from the session (including parent span, if any).
-    _set_traced_with_session(conn, session)
+    listen(session, 'after_begin', _session_after_begin_handler)
 
     # Plug post-operation clean up handlers.
     # The actual session commit/rollback is not traced by us.
-    listen(session, 'before_commit', _session_before_commit_handler, once=True)
-    listen(session, 'after_rollback', _session_rollback_handler, once=True)
+    listen(session, 'after_commit', _session_cleanup_handler)
+    listen(session, 'after_rollback', _session_cleanup_handler)
 
-# Event handlers can't remove themselves
-# Fine, as long as we only fire one of them *once*.
-def _session_before_commit_handler(session):
-    _clear_traced(session)
-    remove(session, 'after_begin', _session_after_begin_handler)
-    remove(session, 'after_rollback', _session_rollback_handler)
+def _connection_cleanup_handler(conn):
+    clear_traced(conn)
 
-def _session_rollback_handler(session):
-    _clear_traced(session)
-    remove(session, 'after_begin', _session_after_begin_handler)
-    remove(session, 'before_commit', _session_before_commit_handler)
+def _session_after_begin_handler(session, transaction, conn):
+    # It's only needed to pass down tracing information
+    # if it was explicitly set.
+    if get_traced(session):
+        _set_traced_with_session(conn, session)
+
+def _session_cleanup_handler(session):
+    clear_traced(session)
 

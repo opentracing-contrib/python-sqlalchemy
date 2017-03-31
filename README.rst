@@ -21,7 +21,7 @@ Please see the examples directory. Overall, basic usage requires that a tracer g
     import sqlalchemy_opentracing
 
     sqlalchemy_opentracing.init_tracing(tracer) # A OpenTracing compatible tracer.
-    sqlalchemy_opentracing.register_connectable(engine) # A valid SQLAlchemy Engine object.
+    sqlalchemy_opentracing.register_engine(engine) # A valid SQLAlchemy Engine object.
 
     with engine.begin() as conn:
         sel = select([users])
@@ -39,6 +39,95 @@ By default, only statements marked to be traced are taken into account (explicit
     with engine.begin() as conn:
         sel = select([users])
         conn.execute(sel)
+
+The resulting spans will have an operation name related to the sql statement (such as `create-table` or `insert`), and will include exception information (if any), the dialect/backend (such as sqlite), and a few other hints.
+
+Tracing under a Connection
+===========================
+
+It is possible to trace all statements being executed under a connection's transaction lifetime. For this, instead of marking a statement as traced, the connection is passed to set_traced() or set_parent_span():
+
+.. code-block:: python
+
+    parent_span = tracer.start_span('ParentSpan')
+    conn = engine.connect()
+
+    with conn.begin() as trans:
+        sqlalchemy_opentracing.set_parent_span(conn, parent_span)
+
+        # these three statements will be traced as children of
+        # parent_span
+        conn.execute(users.insert().values(name='John'))
+        conn.execute(users.insert().values(name='Jason'))
+        conn.execute(users.insert().values(name='Jackie'))
+
+Either a commit or a rollback on a connection's transaction will finish its tracing. If the same Connection object is used afterwards, no tracing will be done for it (unless registered for tracing again). When using (emulated) nested transactions, the tracing needs to be marked at top-level transaction time, and tracing will happen for all statements under the nested transactions:
+
+.. code-block:: python
+
+    with conn.begin() as trans:
+        sqlalchemy_opentracing.set_parent_span(conn, parent_span)
+        conn.execute(users.insert().values(name='John'))
+
+        with conn.begin() as nested_trans:
+            # This statement will also be traced as
+            # child of parent_span
+            conn.execute(users.insert().values(name='Jason'))
+
+
+Tracing under a Session (ORM)
+=============================
+
+It is also possible to trace all actual SQL statements happening during a Session's execution life time - that is, from being fresh to have its statements executed and committed (or rollbacked). For this, the Session object is passed to set_traced or set_parent_span():
+
+.. code-block:: python
+
+    parent_span = tracer.start_span('ParentSpan')
+    session = Session()
+
+    sqlalchemy_opentracing.set_parent_span(session, parent_span)
+    try:
+        session.add(User(name='Jackie'))
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+
+Similar to what happens for Connection, either a commit or a rollback will finish its tracing, and further work on it will not be reported.
+
+Tracing raw SQL statements
+==========================
+
+Executing raw SQL statements can be done through either a Connection or a Session, through their execute() method. Since there's no way to mark each statement individually, tracing them can be done through either tracing all statements, or through tracing a Connection's transaction or Session:
+
+.. code-block:: python
+
+    sqlalchemy_opentracing.set_parent_span(session, parent_span)
+
+    # this statement will be traced as part of the session's execution
+    session.execute('INSERT INTO users VALUES (?, ?)', 1, 'John')
+
+
+Raw SQL statements will be traced having its operation name as `textclause`, to indicate their explicit text nature.
+
+Manually cancel tracing
+=======================
+
+Sometimes no commit nor rollback may happen for a Connection or Session (for example, when doing bulk insertion/update). In this case, manually canceling tracing for an object can be done through clear_traced():
+
+.. code-block:: python
+
+    parent_span = tracer.start_span('ParentSpan')
+    session = Session()
+
+    sqlalchemy_opentracing.set_parent_span(session, parent_span)
+
+    # this will generate tracing of a single INSERT statement.
+    users = [User(name = 'User-%s' % i) for i in xrange(100)]
+    session.bulk_save_objects(users)
+
+    sqlalchemy_opentracing.clear_traced(session)
+
+Manually canceling tracing will not clear any tracing already done - it will simply stop any further tracing for the current statement, Connection or Session object.
 
 Further information
 ===================
