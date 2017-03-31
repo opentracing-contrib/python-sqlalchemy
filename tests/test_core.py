@@ -81,17 +81,15 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_trace_text(self):
         tracer = DummyTracer()
-        creat = CreateTable(self.users_table)
-        self.engine.execute(creat)
 
         sqlalchemy_opentracing.init_tracing(tracer, trace_all=True)
-        self.engine.execute('SELECT name FROM users')
+        self.engine.execute('CREATE TABLE users (id INTEGER NOT NULL, name VARCHAR, PRIMARY KEY (id))')
         self.assertEqual(1, len(tracer.spans))
         self.assertEqual(tracer.spans[0].operation_name, 'textclause')
         self.assertEqual(tracer.spans[0].is_finished, True)
         self.assertEqual(tracer.spans[0].tags, {
             'component': 'sqlalchemy',
-            'db.statement': 'SELECT name FROM users',
+            'db.statement': 'CREATE TABLE users (id INTEGER NOT NULL, name VARCHAR, PRIMARY KEY (id))',
             'db.type': 'sql',
             'sqlalchemy.dialect': 'sqlite',
         })
