@@ -28,12 +28,12 @@ Please see the examples directory. Overall, basic usage requires that a tracer g
         sqlalchemy_opentracing.set_traced(sel)
         conn.execute(sel)
 
-By default, only statements marked to be traced are taken into account (explicitly through set_traced() or implicitly when registering its parent span through set_parent_span()). Alternatively, you can enable tracing of all queries under the registered Engine/Connection:
+By default, only statements marked to be traced are taken into account (explicitly through set_traced() or implicitly when registering its parent span through set_parent_span()). Alternatively, you can enable tracing of all queries under the registered Engine:
 
 .. code-block:: python
 
     sqlalchemy_opentracing.init_tracing(tracer, trace_all=True)
-    sqlalchemy_opentracing.register_connectable(engine)
+    sqlalchemy_opentracing.register_engine(engine)
 
     # this statement will be traced too (without a parent span, though)
     with engine.begin() as conn:
