@@ -77,6 +77,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
             'sqlalchemy.exception': 'table users already exists',
             'error': 'true',
         })
+        self.assertEqual(False, sqlalchemy_opentracing.get_traced(creat))
 
     def test_trace_text(self):
         tracer = DummyTracer()

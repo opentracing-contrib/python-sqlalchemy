@@ -176,6 +176,9 @@ def _engine_error_handler(exception_context):
     span.set_tag('error', 'true')
     span.finish()
 
+    if execution_context.compiled is not None:
+        clear_traced(execution_context.compiled.statement)
+
 def _register_connection_events(conn):
     '''
     Register clean up events for our
