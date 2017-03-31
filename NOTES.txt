@@ -1,0 +1,79 @@
+SQLAlchemy OpenTracing implementation notes
+===========================================
+
+OpenTracing support is implemented through:
+
+1) Decorating objects with 'custom' tracing-related fields
+   (statements, connections, sessions, execution contexts).
+2) Event handling (engine, connections, sessions).
+
+Global Tracer
+=============
+
+We make use of a global tracer, which then is consumed from the event handling we
+setup first. Using this one we start new span objects. One alternative is to use
+an actual object that would keep track itself of the items currently stored at
+the global level, and have different spans with different properties.
+
+Statements
+==========
+
+For tracing at the Core, we decorate statement objects (Insert, CreateTable, etc),
+with tracing and span parent information, which we later consult on the Engine's
+before_cursor_execute event - if there's need to do the tracing, we then create
+a span and store it in the current execution context, and finish it once the cursor
+either finishes (through the after_cursor_execute event), or fails (through the
+handle_error event). We also to post-operation cleanup of this tracing fields.
+
+Connection
+==========
+
+When tracing a connection, we do trace all the statements happening under it
+till either a commit or a rollback happens - these statements follow what is
+described in the previous section.
+
+When a commit or rollback happens, the tracing information is cleared up from
+the connection object - being a mere facade object that gets discarded easily,
+this is not actually needed in many cases, but we do it nevertheless in case
+the object is kept around.
+
+Session
+=======
+
+Session tracing support is very similar to the described one for Connection -
+it relies, though, on a few other events. Specifically, we handle the
+'after_begin' event, which happens when a connection is acquired by the Session
+object to actually do something - in this case we rely on the previously
+described support for Connection. Since a Session *may* have access to more than
+one Engine, it's important to keep the handler for this event around -
+as long as the Session has valid tracing info.
+
+We finally clean up the decorated fields from the Session object at
+either commit or rollback.
+
+Event handlers
+==============
+
+Since the SQLAlchemy documentation describes event handling subscription to be
+relatively expensive, we leave the handlers for a given Connection/Session
+in place, and make use of them *if* the object has valid tracing information
+at the time - else, we do nothing.
+
+This is specially handy for Session, which will very likely be kept around.
+
+Alternative approaches
+======================
+
+One alternative idea going against decorating the objects with
+custom private fields of our own was to use the 'info' dictionary that
+exists for both Connection and Session objects. Sadly, such dictionary
+is 'moved' around for every Connection of the parent Engine, thus is
+not unique, thus we can't use it for thread scenarios.
+
+One alternative was also to have thread local objects - specifically
+to hold the current active span. While this may have worked just fine
+for us, this is something that has been done and re-done in other
+OT libraries/language. Thus we will wait to see how the eventual
+solution for such active-span-holder idea unfolds, and integrate it
+here, if possible.
+
