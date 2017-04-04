@@ -56,7 +56,7 @@ class TestSQLAlchemyORM(unittest.TestCase):
     # test mixing insert with select and insert
     def test_traced_all(self):
         tracer = DummyTracer()
-        sqlalchemy_opentracing.init_tracing(tracer, trace_all=True)
+        sqlalchemy_opentracing.init_tracing(tracer, trace_all_queries=True)
 
         session = self.session
         session.add(User(name='John Doe'))
