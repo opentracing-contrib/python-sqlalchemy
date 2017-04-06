@@ -1,5 +1,6 @@
 import unittest
 from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String
+from sqlalchemy.engine import Engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.schema import CreateTable
 from sqlalchemy.sql import select
@@ -44,14 +45,32 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
         self.assertEqual(0, len(tracer.spans))
 
-    def test_traced_all(self):
+    def test_traced_all_queries(self):
         tracer = DummyTracer()
         creat = CreateTable(self.users_table)
 
-        sqlalchemy_opentracing.init_tracing(tracer, trace_all=True)
+        sqlalchemy_opentracing.init_tracing(tracer, trace_all_queries=True)
         self.engine.execute(creat)
 
         self.assertEqual(1, len(tracer.spans))
+
+    def test_traced_all_engines(self):
+        # Create an engine that is not registered.
+        e = create_engine('sqlite:///:memory:')
+        tracer = DummyTracer()
+        creat = CreateTable(self.users_table)
+
+        sqlalchemy_opentracing.init_tracing(tracer, trace_all_engines=True)
+        sqlalchemy_opentracing.set_traced(creat)
+        e.execute(creat)
+
+        # Unregister the main Engine class before doing our assertions,
+        # in case we fail.
+        sqlalchemy_opentracing.unregister_engine(Engine)
+
+        self.assertEqual(1, len(tracer.spans))
+        self.assertEqual('create_table', tracer.spans[0].operation_name)
+        self.assertEqual(True, tracer.spans[0].is_finished)
 
     def test_traced_error(self):
         tracer = DummyTracer()
@@ -82,7 +101,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
     def test_trace_text(self):
         tracer = DummyTracer()
 
-        sqlalchemy_opentracing.init_tracing(tracer, trace_all=True)
+        sqlalchemy_opentracing.init_tracing(tracer, trace_all_queries=True)
         self.engine.execute('CREATE TABLE users (id INTEGER NOT NULL, name VARCHAR, PRIMARY KEY (id))')
         self.assertEqual(1, len(tracer.spans))
         self.assertEqual(tracer.spans[0].operation_name, 'textclause')
@@ -97,7 +116,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
     def test_trace_text_error(self):
         tracer = DummyTracer()
 
-        sqlalchemy_opentracing.init_tracing(tracer, trace_all=True)
+        sqlalchemy_opentracing.init_tracing(tracer, trace_all_queries=True)
         try:
             self.engine.execute('SELECT name FROM users')
         except OperationalError:
@@ -260,7 +279,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
         tracer = DummyTracer()
         creat = CreateTable(self.users_table)
 
-        sqlalchemy_opentracing.init_tracing(tracer, trace_all=True)
+        sqlalchemy_opentracing.init_tracing(tracer, trace_all_queries=True)
         self.engine.execute(creat)
         self.assertEqual(1, len(tracer.spans))
 

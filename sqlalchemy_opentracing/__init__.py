@@ -1,23 +1,26 @@
-from sqlalchemy.engine import Connection
+from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.event import contains, listen, remove
 from sqlalchemy.orm import Session
 
 g_tracer = None
-g_trace_all = True
+g_trace_all_queries = False
 
-def init_tracing(tracer, trace_all=False):
+def init_tracing(tracer, trace_all_engines=False, trace_all_queries=False):
     '''
     Set our global tracer.
     Tracer objects from our pyramid/flask/django libraries
     can be passed as well.
     '''
-    global g_tracer, g_trace_all
+    global g_tracer, g_trace_all_queries
     if hasattr(tracer, '_tracer'):
         g_tracer = tracer._tracer
     else:
         g_tracer = tracer
 
-    g_trace_all = trace_all
+    g_trace_all_queries = trace_all_queries
+
+    if trace_all_engines:
+        register_engine(Engine)
 
 def get_traced(obj):
     '''
@@ -130,7 +133,7 @@ def _engine_before_cursor_handler(conn, cursor,
 
     # Don't trace if trace_all is disabled
     # and the connection/statement wasn't marked explicitly.
-    if not (g_trace_all or _can_operation_be_traced(conn, stmt_obj)):
+    if not (g_trace_all_queries or _can_operation_be_traced(conn, stmt_obj)):
         return
 
     # Don't trace PRAGMA statements coming from SQLite

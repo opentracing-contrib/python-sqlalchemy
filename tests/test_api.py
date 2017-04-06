@@ -1,4 +1,5 @@
 import unittest
+from mock import patch
 from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.schema import CreateTable
@@ -18,20 +19,32 @@ class TestGlobalCalls(unittest.TestCase):
         tracer = DummyTracer()
         sqlalchemy_opentracing.init_tracing(tracer)
         self.assertEqual(tracer, sqlalchemy_opentracing.g_tracer)
-        self.assertEqual(False, sqlalchemy_opentracing.g_trace_all)
+        self.assertEqual(False, sqlalchemy_opentracing.g_trace_all_queries)
 
     def test_init_subtracer(self):
         tracer = DummyTracer(with_subtracer=True)
         sqlalchemy_opentracing.init_tracing(tracer)
         self.assertEqual(tracer._tracer, sqlalchemy_opentracing.g_tracer)
-        self.assertEqual(False, sqlalchemy_opentracing.g_trace_all)
+        self.assertEqual(False, sqlalchemy_opentracing.g_trace_all_queries)
 
-    def test_init_traceall(self):
-        sqlalchemy_opentracing.init_tracing(DummyTracer(), False)
-        self.assertEqual(False, sqlalchemy_opentracing.g_trace_all)
+    def test_init_trace_all_queries(self):
+        sqlalchemy_opentracing.init_tracing(DummyTracer(), trace_all_queries=False)
+        self.assertEqual(False, sqlalchemy_opentracing.g_trace_all_queries)
 
-        sqlalchemy_opentracing.init_tracing(DummyTracer(), True)
-        self.assertEqual(True, sqlalchemy_opentracing.g_trace_all)
+        sqlalchemy_opentracing.init_tracing(DummyTracer(), trace_all_queries=True)
+        self.assertEqual(True, sqlalchemy_opentracing.g_trace_all_queries)
+
+    @patch('sqlalchemy_opentracing.register_engine')
+    def test_init_trace_all_engines(self, mock_register):
+        tracer = DummyTracer()
+        sqlalchemy_opentracing.init_tracing(tracer)
+        self.assertEqual(0, mock_register.call_count)
+
+        sqlalchemy_opentracing.init_tracing(tracer, trace_all_engines=False)
+        self.assertEqual(0, mock_register.call_count)
+
+        sqlalchemy_opentracing.init_tracing(tracer, trace_all_engines=True)
+        self.assertEqual(1, mock_register.call_count)
 
     def test_traced_property(self):
         stmt_obj = CreateTable(self.users_table)
