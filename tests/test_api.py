@@ -15,6 +15,9 @@ class TestGlobalCalls(unittest.TestCase):
             Column('name', String),
         )
 
+    def tearDown(self):
+        sqlalchemy_opentracing.g_tracer = None
+
     def test_init(self):
         tracer = DummyTracer()
         sqlalchemy_opentracing.init_tracing(tracer)
@@ -63,4 +66,9 @@ class TestGlobalCalls(unittest.TestCase):
         sqlalchemy_opentracing.set_traced(stmt)
         self.assertEqual(False, sqlalchemy_opentracing.has_parent_span(stmt))
         self.assertEqual(None, sqlalchemy_opentracing.get_parent_span(stmt))
+
+    def test_register_no_tracer(self):
+        engine = create_engine('sqlite:///:memory:')
+        with self.assertRaises(RuntimeError):
+            sqlalchemy_opentracing.register_engine(engine)
 

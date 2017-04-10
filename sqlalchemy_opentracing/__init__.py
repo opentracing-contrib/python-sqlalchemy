@@ -12,11 +12,13 @@ def init_tracing(tracer, trace_all_engines=False, trace_all_queries=False):
     can be passed as well.
     '''
     global g_tracer, g_trace_all_queries
-    if hasattr(tracer, '_tracer'):
-        g_tracer = tracer._tracer
-    else:
-        g_tracer = tracer
 
+    if hasattr(tracer, '_tracer'):
+        tracer = tracer._tracer
+    else:
+        tracer = tracer
+
+    g_tracer = tracer
     g_trace_all_queries = trace_all_queries
 
     if trace_all_engines:
@@ -79,6 +81,9 @@ def register_engine(obj):
     '''
     Register an engine to have its events be traced.
     '''
+    if g_tracer is None:
+        raise RuntimeError('The tracer is not properly set')
+
     listen(obj, 'before_cursor_execute', _engine_before_cursor_handler)
     listen(obj, 'after_cursor_execute', _engine_after_cursor_handler)
     listen(obj, 'handle_error', _engine_error_handler)
