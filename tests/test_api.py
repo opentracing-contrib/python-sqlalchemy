@@ -17,7 +17,7 @@ class TestGlobalCalls(unittest.TestCase):
         )
 
     def tearDown(self):
-        sqlalchemy_opentracing.g_tracer = None
+        sqlalchemy_opentracing._clear_tracer()
 
     def test_init(self):
         tracer = DummyTracer()

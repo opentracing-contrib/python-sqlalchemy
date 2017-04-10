@@ -16,7 +16,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
             Column('name', String),
         )
     def tearDown(self):
-        sqlalchemy_opentracing.g_tracer = None
+        sqlalchemy_opentracing._clear_tracer()
 
     def test_traced(self):
         tracer = DummyTracer()

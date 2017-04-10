@@ -22,7 +22,7 @@ class TestSQLAlchemyORM(unittest.TestCase):
         User.metadata.create_all(self.engine)
 
     def tearDown(self):
-        sqlalchemy_opentracing.g_tracer = None
+        sqlalchemy_opentracing._clear_tracer()
 
     def test_traced_simple(self):
         tracer = DummyTracer()

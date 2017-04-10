@@ -100,6 +100,13 @@ def unregister_engine(obj):
     remove(obj, 'after_cursor_execute', _engine_after_cursor_handler)
     remove(obj, 'handle_error', _engine_error_handler)
 
+def _clear_tracer():
+    '''
+    Set the tracer to None. For test cases usage.
+    '''
+    global g_tracer
+    g_tracer = None
+
 def _can_operation_be_traced(conn, stmt_obj):
     '''
     Get whether an operation can be traced, depending on its
