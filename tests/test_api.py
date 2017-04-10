@@ -1,6 +1,7 @@
 import unittest
 from mock import patch
 from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String
+from sqlalchemy.engine import Engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.schema import CreateTable
 
@@ -71,4 +72,13 @@ class TestGlobalCalls(unittest.TestCase):
         engine = create_engine('sqlite:///:memory:')
         with self.assertRaises(RuntimeError):
             sqlalchemy_opentracing.register_engine(engine)
+
+    def test_register_dup(self):
+        engine = create_engine('sqlite:///:memory:')
+        sqlalchemy_opentracing.init_tracing(DummyTracer(), trace_all_engines=True)
+        with self.assertRaises(RuntimeError):
+            sqlalchemy_opentracing.register_engine(engine)
+
+        # Manually clear the Engine from listening events.
+        sqlalchemy_opentracing.unregister_engine(Engine)
 
