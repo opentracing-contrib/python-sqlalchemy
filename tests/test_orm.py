@@ -21,11 +21,13 @@ class TestSQLAlchemyORM(unittest.TestCase):
         self.session = sessionmaker(bind=self.engine)()
         User.metadata.create_all(self.engine)
 
-        sqlalchemy_opentracing.register_engine(self.engine)
+    def tearDown(self):
+        sqlalchemy_opentracing._clear_tracer()
 
     def test_traced_simple(self):
         tracer = DummyTracer()
         sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.register_engine(self.engine)
 
         session = self.session
         sqlalchemy_opentracing.set_traced(session)
@@ -45,6 +47,7 @@ class TestSQLAlchemyORM(unittest.TestCase):
     def test_traced_none(self):
         tracer = DummyTracer()
         sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.register_engine(self.engine)
 
         session = self.session
         session.add(User(name='John Doe'))
@@ -57,6 +60,7 @@ class TestSQLAlchemyORM(unittest.TestCase):
     def test_traced_all(self):
         tracer = DummyTracer()
         sqlalchemy_opentracing.init_tracing(tracer, trace_all_queries=True)
+        sqlalchemy_opentracing.register_engine(self.engine)
 
         session = self.session
         session.add(User(name='John Doe'))
@@ -71,6 +75,7 @@ class TestSQLAlchemyORM(unittest.TestCase):
     def test_traced_error(self):
         tracer = DummyTracer()
         sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.register_engine(self.engine)
 
         # Don't trace this one.
         session = self.session
@@ -100,6 +105,7 @@ class TestSQLAlchemyORM(unittest.TestCase):
     def test_traced_parent(self):
         tracer = DummyTracer()
         sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.register_engine(self.engine)
 
         session = self.session
         parent_span = DummySpan('parent')
@@ -116,6 +122,7 @@ class TestSQLAlchemyORM(unittest.TestCase):
     def test_traced_text(self):
         tracer = DummyTracer()
         sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.register_engine(self.engine)
 
         session = self.session
         span = DummySpan('parent span')
@@ -136,6 +143,7 @@ class TestSQLAlchemyORM(unittest.TestCase):
     def test_traced_text_error(self):
         tracer = DummyTracer()
         sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.register_engine(self.engine)
 
         session = self.session
         span = DummySpan('parent span')
@@ -161,6 +169,7 @@ class TestSQLAlchemyORM(unittest.TestCase):
     def test_traced_after_commit(self):
         tracer = DummyTracer()
         sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.register_engine(self.engine)
 
         session = self.session
         sqlalchemy_opentracing.set_traced(session)
@@ -181,6 +190,7 @@ class TestSQLAlchemyORM(unittest.TestCase):
     def test_traced_after_rollback(self):
         tracer = DummyTracer()
         sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.register_engine(self.engine)
 
         session = self.session
         sqlalchemy_opentracing.set_traced(session)
@@ -203,6 +213,7 @@ class TestSQLAlchemyORM(unittest.TestCase):
     def test_traced_commit_repeat(self):
         tracer = DummyTracer()
         sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.register_engine(self.engine)
 
         parent_span1 = DummySpan('parent1')
         session = self.session
@@ -227,6 +238,7 @@ class TestSQLAlchemyORM(unittest.TestCase):
     def test_traced_savepoint(self):
         tracer = DummyTracer()
         sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.register_engine(self.engine)
 
         session = self.session
         sqlalchemy_opentracing.set_traced(session)
@@ -245,6 +257,7 @@ class TestSQLAlchemyORM(unittest.TestCase):
     def test_traced_bulk_insert(self):
         tracer = DummyTracer()
         sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.register_engine(self.engine)
 
         parent_span = DummySpan('parent')
         session = self.session
@@ -265,6 +278,7 @@ class TestSQLAlchemyORM(unittest.TestCase):
     def test_traced_clear_session(self):
         tracer = DummyTracer()
         sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.register_engine(self.engine)
 
         session = self.session
         sqlalchemy_opentracing.set_traced(session)

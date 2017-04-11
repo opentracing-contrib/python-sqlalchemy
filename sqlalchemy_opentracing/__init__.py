@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 g_tracer = None
 g_trace_all_queries = False
+g_trace_all_engines = False
 
 def init_tracing(tracer, trace_all_engines=False, trace_all_queries=False):
     '''
@@ -11,13 +12,16 @@ def init_tracing(tracer, trace_all_engines=False, trace_all_queries=False):
     Tracer objects from our pyramid/flask/django libraries
     can be passed as well.
     '''
-    global g_tracer, g_trace_all_queries
-    if hasattr(tracer, '_tracer'):
-        g_tracer = tracer._tracer
-    else:
-        g_tracer = tracer
+    global g_tracer, g_trace_all_engines, g_trace_all_queries
 
+    if hasattr(tracer, '_tracer'):
+        tracer = tracer._tracer
+    else:
+        tracer = tracer
+
+    g_tracer = tracer
     g_trace_all_queries = trace_all_queries
+    g_trace_all_engines = trace_all_engines
 
     if trace_all_engines:
         register_engine(Engine)
@@ -79,6 +83,11 @@ def register_engine(obj):
     '''
     Register an engine to have its events be traced.
     '''
+    if g_tracer is None:
+        raise RuntimeError('The tracer is not properly set')
+    if g_trace_all_engines and obj != Engine:
+        raise RuntimeError('Tracing all engines already')
+
     listen(obj, 'before_cursor_execute', _engine_before_cursor_handler)
     listen(obj, 'after_cursor_execute', _engine_after_cursor_handler)
     listen(obj, 'handle_error', _engine_error_handler)
@@ -90,6 +99,13 @@ def unregister_engine(obj):
     remove(obj, 'before_cursor_execute', _engine_before_cursor_handler)
     remove(obj, 'after_cursor_execute', _engine_after_cursor_handler)
     remove(obj, 'handle_error', _engine_error_handler)
+
+def _clear_tracer():
+    '''
+    Set the tracer to None. For test cases usage.
+    '''
+    global g_tracer
+    g_tracer = None
 
 def _can_operation_be_traced(conn, stmt_obj):
     '''

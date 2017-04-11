@@ -70,7 +70,14 @@ exists for both Connection and Session objects. Sadly, such dictionary
 is 'moved' around for every Connection of the parent Engine, thus is
 not unique, thus we can't use it for thread scenarios.
 
-One alternative was also to have thread local objects - specifically
+A second alternative is to use a weak dictionary - so we keep
+the statements/connection/session around, and even if they are
+used/ignored/forgotten, we don't keep them around forever. This is
+similar to what the Django/Flask/Pyramid connectors do, with the
+exception of them having a well defined lifetime for the decorated
+objects (the request one).
+
+A third alternative was also to have thread local objects - specifically
 to hold the current active span. While this may have worked just fine
 for us, this is something that has been done and re-done in other
 OT libraries/language. Thus we will wait to see how the eventual

@@ -15,13 +15,15 @@ class TestSQLAlchemyCore(unittest.TestCase):
             Column('id', Integer, primary_key=True),
             Column('name', String),
         )
-        sqlalchemy_opentracing.register_engine(self.engine)
+    def tearDown(self):
+        sqlalchemy_opentracing._clear_tracer()
 
     def test_traced(self):
         tracer = DummyTracer()
-        creat = CreateTable(self.users_table)
-
         sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.register_engine(self.engine)
+
+        creat = CreateTable(self.users_table)
         sqlalchemy_opentracing.set_traced(creat)
         self.engine.execute(creat)
 
@@ -38,31 +40,32 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_traced_none(self):
         tracer = DummyTracer()
-        creat = CreateTable(self.users_table)
-
         sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.register_engine(self.engine)
+
+        creat = CreateTable(self.users_table)
         self.engine.execute(creat)
 
         self.assertEqual(0, len(tracer.spans))
 
     def test_traced_all_queries(self):
         tracer = DummyTracer()
-        creat = CreateTable(self.users_table)
-
         sqlalchemy_opentracing.init_tracing(tracer, trace_all_queries=True)
+        sqlalchemy_opentracing.register_engine(self.engine)
+
+        creat = CreateTable(self.users_table)
         self.engine.execute(creat)
 
         self.assertEqual(1, len(tracer.spans))
 
     def test_traced_all_engines(self):
-        # Create an engine that is not registered.
-        e = create_engine('sqlite:///:memory:')
+        # Don't register the engine explicitly.
         tracer = DummyTracer()
-        creat = CreateTable(self.users_table)
-
         sqlalchemy_opentracing.init_tracing(tracer, trace_all_engines=True)
+
+        creat = CreateTable(self.users_table)
         sqlalchemy_opentracing.set_traced(creat)
-        e.execute(creat)
+        self.engine.execute(creat)
 
         # Unregister the main Engine class before doing our assertions,
         # in case we fail.
@@ -74,9 +77,10 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_traced_error(self):
         tracer = DummyTracer()
-        creat = CreateTable(self.users_table)
-
         sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.register_engine(self.engine)
+
+        creat = CreateTable(self.users_table)
         self.engine.execute(creat)
         self.assertEqual(0, len(tracer.spans))
 
@@ -100,8 +104,9 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_trace_text(self):
         tracer = DummyTracer()
-
         sqlalchemy_opentracing.init_tracing(tracer, trace_all_queries=True)
+        sqlalchemy_opentracing.register_engine(self.engine)
+
         self.engine.execute('CREATE TABLE users (id INTEGER NOT NULL, name VARCHAR, PRIMARY KEY (id))')
         self.assertEqual(1, len(tracer.spans))
         self.assertEqual(tracer.spans[0].operation_name, 'textclause')
@@ -115,8 +120,9 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_trace_text_error(self):
         tracer = DummyTracer()
-
         sqlalchemy_opentracing.init_tracing(tracer, trace_all_queries=True)
+        sqlalchemy_opentracing.register_engine(self.engine)
+
         try:
             self.engine.execute('SELECT name FROM users')
         except OperationalError:
@@ -136,11 +142,13 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_traced_transaction(self):
         tracer = DummyTracer()
+        sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.register_engine(self.engine)
+
         creat = CreateTable(self.users_table)
         ins = self.users_table.insert().values(name='John Doe')
         sel = select([self.users_table])
 
-        sqlalchemy_opentracing.init_tracing(tracer)
         parent_span = DummySpan('parent span')
         conn = self.engine.connect()
         with conn.begin() as trans:
@@ -157,11 +165,13 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_traced_transaction_nested(self):
         tracer = DummyTracer()
+        sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.register_engine(self.engine)
+
         creat = CreateTable(self.users_table)
         ins = self.users_table.insert().values(name='John Doe')
         sel = select([self.users_table])
 
-        sqlalchemy_opentracing.init_tracing(tracer)
         parent_span = DummySpan('parent span')
         conn = self.engine.connect()
 
@@ -181,13 +191,15 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_traced_rollback(self):
         tracer = DummyTracer()
+        sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.register_engine(self.engine)
+
         creat = CreateTable(self.users_table)
         ins = self.users_table.insert().values(name='John Doe')
 
         # Don't trace this.
         self.engine.execute(creat)
 
-        sqlalchemy_opentracing.init_tracing(tracer)
         parent_span = DummySpan('parent span')
         conn = self.engine.connect()
         try:
@@ -208,9 +220,11 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_traced_after_transaction(self):
         tracer = DummyTracer()
+        sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.register_engine(self.engine)
+
         creat = CreateTable(self.users_table)
 
-        sqlalchemy_opentracing.init_tracing(tracer)
         conn = self.engine.connect()
         with conn.begin() as tx:
             sqlalchemy_opentracing.set_traced(conn)
@@ -229,10 +243,12 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_traced_after_rollback(self):
         tracer = DummyTracer()
+        sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.register_engine(self.engine)
+
         creat = CreateTable(self.users_table)
 
         # Create a table, but don't trace it
-        sqlalchemy_opentracing.init_tracing(tracer)
         conn = self.engine.connect()
         with conn.begin() as tx:
             conn.execute(creat)
@@ -257,10 +273,11 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_traced_clear_connection(self):
         tracer = DummyTracer()
+        sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.register_engine(self.engine)
+
         creat = CreateTable(self.users_table)
         ins = self.users_table.insert().values(name='John Doe')
-
-        sqlalchemy_opentracing.init_tracing(tracer)
 
         conn = self.engine.connect()
         with conn.begin() as tx:
@@ -277,9 +294,10 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_unregister_engine(self):
         tracer = DummyTracer()
-        creat = CreateTable(self.users_table)
-
         sqlalchemy_opentracing.init_tracing(tracer, trace_all_queries=True)
+        sqlalchemy_opentracing.register_engine(self.engine)
+
+        creat = CreateTable(self.users_table)
         self.engine.execute(creat)
         self.assertEqual(1, len(tracer.spans))
 
