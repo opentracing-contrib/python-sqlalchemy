@@ -16,8 +16,6 @@ def init_tracing(tracer, trace_all_engines=False, trace_all_queries=False):
 
     if hasattr(tracer, '_tracer'):
         tracer = tracer._tracer
-    else:
-        tracer = tracer
 
     g_tracer = tracer
     g_trace_all_queries = trace_all_queries
