@@ -6,7 +6,7 @@ g_tracer = None
 g_trace_all_queries = False
 g_trace_all_engines = False
 
-def init_tracing(tracer, trace_all_engines=False, trace_all_queries=False):
+def init_tracing(tracer, trace_all_engines=True, trace_all_queries=True):
     '''
     Set our global tracer.
     Tracer objects from our pyramid/flask/django libraries
