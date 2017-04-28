@@ -14,44 +14,41 @@ Run the following command::
 Getting started
 ===============
 
-Please see the examples directory. Overall, basic usage requires that a tracer gets set, an Engine (or Connection) is registered, and statements get their parent spans assigned (if any):
+Please see the examples directory. Overall, basic usage requires that a tracer gets set, and statements get their parent spans assigned (if any):
 
 .. code-block:: python
 
     import sqlalchemy_opentracing
 
     sqlalchemy_opentracing.init_tracing(tracer) # A OpenTracing compatible tracer.
-    sqlalchemy_opentracing.register_engine(engine) # A valid SQLAlchemy Engine object.
+
+    with engine.begin() as conn:
+        sel = select([users])
+        sqlalchemy_opentracing.set_parent_span(sel, main_span)
+        conn.execute(sel)
+
+By default, all statements in all engines are traced. Alternatively, you can enable tracing of all queries under a specific Engine by specifying that not all engines are registered, and register the Engine yourself:
+
+.. code-block:: python
+
+    sqlalchemy_opentracing.init_tracing(tracer, trace_all_engines=False)
+    sqlalchemy_opentracing.register_engine(engine)
+
+    # Only queries under `engine` will be traced.
+    with engine.begin() as conn:
+        sel = select([users])
+        conn.execute(sel)
+
+It is also possible to prevent tracing of all queries automatically (independently of whether all engines are traced or not), and have them marked explicitly (with or without a parent span):
+
+.. code-block:: python
+
+    sqlalchemy_opentracing.init_tracing(tracer, trace_all_queries=False)
 
     with engine.begin() as conn:
         sel = select([users])
         sqlalchemy_opentracing.set_traced(sel)
-        conn.execute(sel)
-
-By default, only statements marked to be traced are taken into account (explicitly through set_traced() or implicitly when registering its parent span through set_parent_span()). Alternatively, you can enable tracing of all queries under the registered Engine:
-
-.. code-block:: python
-
-    sqlalchemy_opentracing.init_tracing(tracer, trace_all_queries=True)
-    sqlalchemy_opentracing.register_engine(engine)
-
-    # this statement will be traced too (without a parent span, though)
-    with engine.begin() as conn:
-        sel = select([users])
-        conn.execute(sel)
-
-It is also possible to have all engines being registered automatically (independently of the `trace_all_queries` flag, which can be enabled or disabled):
-
-.. code-block:: python
-
-    # No need to call register_engine()
-    sqlalchemy_opentracing.init_tracing(tracer, trace_all_engines=True)
-
-    with engine.begin() as conn:
-        sel = select([users])
-        ...
-
-This is equivalent to calling `register_engine` with the `sqlalchemy.engine.Engine` class.
+        sqlalchemy_opentracing.set_parent_span(sel, main_span) # Optional
 
 The resulting spans will have an operation name related to the sql statement (such as `create-table` or `insert`), and will include exception information (if any), the dialect/backend (such as sqlite), and a few other hints.
 

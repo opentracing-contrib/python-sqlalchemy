@@ -20,7 +20,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_traced(self):
         tracer = DummyTracer()
-        sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.init_tracing(tracer, False, False)
         sqlalchemy_opentracing.register_engine(self.engine)
 
         creat = CreateTable(self.users_table)
@@ -40,7 +40,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_traced_none(self):
         tracer = DummyTracer()
-        sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.init_tracing(tracer, False, False)
         sqlalchemy_opentracing.register_engine(self.engine)
 
         creat = CreateTable(self.users_table)
@@ -50,7 +50,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_traced_all_queries(self):
         tracer = DummyTracer()
-        sqlalchemy_opentracing.init_tracing(tracer, trace_all_queries=True)
+        sqlalchemy_opentracing.init_tracing(tracer, False, trace_all_queries=True)
         sqlalchemy_opentracing.register_engine(self.engine)
 
         creat = CreateTable(self.users_table)
@@ -61,7 +61,9 @@ class TestSQLAlchemyCore(unittest.TestCase):
     def test_traced_all_engines(self):
         # Don't register the engine explicitly.
         tracer = DummyTracer()
-        sqlalchemy_opentracing.init_tracing(tracer, trace_all_engines=True)
+        sqlalchemy_opentracing.init_tracing(tracer,
+                                            trace_all_engines=True,
+                                            trace_all_queries=False)
 
         creat = CreateTable(self.users_table)
         sqlalchemy_opentracing.set_traced(creat)
@@ -77,7 +79,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_traced_error(self):
         tracer = DummyTracer()
-        sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.init_tracing(tracer, False, False)
         sqlalchemy_opentracing.register_engine(self.engine)
 
         creat = CreateTable(self.users_table)
@@ -104,7 +106,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_trace_text(self):
         tracer = DummyTracer()
-        sqlalchemy_opentracing.init_tracing(tracer, trace_all_queries=True)
+        sqlalchemy_opentracing.init_tracing(tracer, False, trace_all_queries=True)
         sqlalchemy_opentracing.register_engine(self.engine)
 
         self.engine.execute('CREATE TABLE users (id INTEGER NOT NULL, name VARCHAR, PRIMARY KEY (id))')
@@ -120,7 +122,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_trace_text_error(self):
         tracer = DummyTracer()
-        sqlalchemy_opentracing.init_tracing(tracer, trace_all_queries=True)
+        sqlalchemy_opentracing.init_tracing(tracer, False, trace_all_queries=True)
         sqlalchemy_opentracing.register_engine(self.engine)
 
         try:
@@ -142,7 +144,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_traced_transaction(self):
         tracer = DummyTracer()
-        sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.init_tracing(tracer, False, False)
         sqlalchemy_opentracing.register_engine(self.engine)
 
         creat = CreateTable(self.users_table)
@@ -165,7 +167,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_traced_transaction_nested(self):
         tracer = DummyTracer()
-        sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.init_tracing(tracer, False, False)
         sqlalchemy_opentracing.register_engine(self.engine)
 
         creat = CreateTable(self.users_table)
@@ -191,7 +193,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_traced_rollback(self):
         tracer = DummyTracer()
-        sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.init_tracing(tracer, False, False)
         sqlalchemy_opentracing.register_engine(self.engine)
 
         creat = CreateTable(self.users_table)
@@ -220,7 +222,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_traced_after_transaction(self):
         tracer = DummyTracer()
-        sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.init_tracing(tracer, False, False)
         sqlalchemy_opentracing.register_engine(self.engine)
 
         creat = CreateTable(self.users_table)
@@ -243,7 +245,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_traced_after_rollback(self):
         tracer = DummyTracer()
-        sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.init_tracing(tracer, False, False)
         sqlalchemy_opentracing.register_engine(self.engine)
 
         creat = CreateTable(self.users_table)
@@ -273,7 +275,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_traced_clear_connection(self):
         tracer = DummyTracer()
-        sqlalchemy_opentracing.init_tracing(tracer)
+        sqlalchemy_opentracing.init_tracing(tracer, False, False)
         sqlalchemy_opentracing.register_engine(self.engine)
 
         creat = CreateTable(self.users_table)
@@ -294,7 +296,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
 
     def test_unregister_engine(self):
         tracer = DummyTracer()
-        sqlalchemy_opentracing.init_tracing(tracer, trace_all_queries=True)
+        sqlalchemy_opentracing.init_tracing(tracer, False, trace_all_queries=True)
         sqlalchemy_opentracing.register_engine(self.engine)
 
         creat = CreateTable(self.users_table)

@@ -19,19 +19,22 @@ class TestGlobalCalls(unittest.TestCase):
     def tearDown(self):
         sqlalchemy_opentracing._clear_tracer()
 
-    def test_init(self):
+    @patch('sqlalchemy_opentracing.register_engine')
+    def test_init(self, mock_register):
         tracer = DummyTracer()
         sqlalchemy_opentracing.init_tracing(tracer)
         self.assertEqual(tracer, sqlalchemy_opentracing.g_tracer)
-        self.assertEqual(False, sqlalchemy_opentracing.g_trace_all_queries)
+        self.assertEqual(True, sqlalchemy_opentracing.g_trace_all_queries)
 
-    def test_init_subtracer(self):
+    @patch('sqlalchemy_opentracing.register_engine')
+    def test_init_subtracer(self, mock_register):
         tracer = DummyTracer(with_subtracer=True)
         sqlalchemy_opentracing.init_tracing(tracer)
         self.assertEqual(tracer._tracer, sqlalchemy_opentracing.g_tracer)
-        self.assertEqual(False, sqlalchemy_opentracing.g_trace_all_queries)
+        self.assertEqual(True, sqlalchemy_opentracing.g_trace_all_queries)
 
-    def test_init_trace_all_queries(self):
+    @patch('sqlalchemy_opentracing.register_engine')
+    def test_init_trace_all_queries(self, mock_register):
         sqlalchemy_opentracing.init_tracing(DummyTracer(), trace_all_queries=False)
         self.assertEqual(False, sqlalchemy_opentracing.g_trace_all_queries)
 
@@ -42,13 +45,13 @@ class TestGlobalCalls(unittest.TestCase):
     def test_init_trace_all_engines(self, mock_register):
         tracer = DummyTracer()
         sqlalchemy_opentracing.init_tracing(tracer)
-        self.assertEqual(0, mock_register.call_count)
+        self.assertEqual(1, mock_register.call_count)
 
         sqlalchemy_opentracing.init_tracing(tracer, trace_all_engines=False)
-        self.assertEqual(0, mock_register.call_count)
+        self.assertEqual(1, mock_register.call_count) # Not called
 
         sqlalchemy_opentracing.init_tracing(tracer, trace_all_engines=True)
-        self.assertEqual(1, mock_register.call_count)
+        self.assertEqual(2, mock_register.call_count) # Called again
 
     def test_traced_property(self):
         stmt_obj = CreateTable(self.users_table)
