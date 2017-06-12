@@ -4,8 +4,8 @@ version = open('VERSION').read()
 setup(
     name='sqlalchemy_opentracing',
     version=version,
-    url='https://github.com/carlosalberto/python-sqlalchemy/',
-    download_url='https://github.com/carlosalberto/python-sqlalchemy/tarball/'+version,
+    url='https://github.com/opentracing-contrib/python-sqlalchemy/',
+    download_url='https://github.com/opentracing-contrib/python-sqlalchemy/tarball/'+version,
     license='BSD',
     author='Carlos Alberto Cortez',
     author_email='calberto.cortez@gmail.com',
