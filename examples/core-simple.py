@@ -1,13 +1,11 @@
 from sqlalchemy import MetaData, Table, Integer, String, Column, create_engine
 from sqlalchemy.schema import CreateTable
 
-import lightstep
+import opentracing
 import sqlalchemy_opentracing
 
-tracer = lightstep.Tracer(
-    component_name='sqlalchemy-simple',
-    access_token='{your_lightstep_token}'
-)
+# Your OpenTracing-compatible tracer here.
+tracer = opentracing.Tracer()
 
 if __name__ == '__main__':
     engine = create_engine('sqlite:///:memory:')
