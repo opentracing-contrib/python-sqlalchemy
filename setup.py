@@ -6,7 +6,7 @@ setup(
     version=version,
     url='https://github.com/opentracing-contrib/python-sqlalchemy/',
     download_url='https://github.com/opentracing-contrib/python-sqlalchemy/tarball/'+version,
-    license='BSD',
+    license='Apache License 2.0',
     author='Carlos Alberto Cortez',
     author_email='calberto.cortez@gmail.com',
     description='OpenTracing support for SQLAlchemy',
