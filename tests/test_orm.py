@@ -262,7 +262,7 @@ class TestSQLAlchemyORM(unittest.TestCase):
         parent_span = DummySpan('parent')
         session = self.session
         sqlalchemy_opentracing.set_parent_span(session, parent_span)
-        users = [User(name = 'User-%s' % i) for i in xrange(10)]
+        users = [User(name = 'User-%s' % i) for i in range(10)]
         session.bulk_save_objects(users)
 
         self.assertEqual(1, len(tracer.spans))
