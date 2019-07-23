@@ -15,7 +15,7 @@ setup(
     platforms='any',
     install_requires=[
         'sqlalchemy',
-        'opentracing>=1.1,<=2'
+        'opentracing>=1.1,<=2.2'
     ],
     classifiers=[
         'Intended Audience :: Developers',
