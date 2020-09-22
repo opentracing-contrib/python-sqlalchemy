@@ -1,5 +1,5 @@
 import unittest
-from mock import patch
+from unittest.mock import patch
 from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import OperationalError

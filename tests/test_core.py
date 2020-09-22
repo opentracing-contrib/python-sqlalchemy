@@ -163,7 +163,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
         self.assertEqual(True, all(map(lambda x: x.is_finished, tracer.spans)))
         self.assertEqual(True, all(map(lambda x: x.child_of == parent_span, tracer.spans)))
         self.assertEqual(['create_table', 'insert', 'select'],
-                         map(lambda x: x.operation_name, tracer.spans))
+                         list(map(lambda x: x.operation_name, tracer.spans)))
 
     def test_traced_transaction_nested(self):
         tracer = DummyTracer()
@@ -189,7 +189,7 @@ class TestSQLAlchemyCore(unittest.TestCase):
         self.assertEqual(True, all(map(lambda x: x.is_finished, tracer.spans)))
         self.assertEqual(True, all(map(lambda x: x.child_of == parent_span, tracer.spans)))
         self.assertEqual(['create_table', 'insert', 'select'],
-                         map(lambda x: x.operation_name, tracer.spans))
+                         list(map(lambda x: x.operation_name, tracer.spans)))
 
     def test_traced_rollback(self):
         tracer = DummyTracer()
@@ -216,9 +216,9 @@ class TestSQLAlchemyCore(unittest.TestCase):
         self.assertEqual(True, all(map(lambda x: x.is_finished, tracer.spans)))
         self.assertEqual(True, all(map(lambda x: x.child_of == parent_span, tracer.spans)))
         self.assertEqual(['insert', 'create_table'],
-                         map(lambda x: x.operation_name, tracer.spans))
+                         list(map(lambda x: x.operation_name, tracer.spans)))
         self.assertEqual(['false', 'true'],
-                         map(lambda x: x.tags.get('error', 'false'), tracer.spans))
+                         list(map(lambda x: x.tags.get('error', 'false'), tracer.spans)))
 
     def test_traced_after_transaction(self):
         tracer = DummyTracer()
