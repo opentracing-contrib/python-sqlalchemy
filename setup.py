@@ -15,8 +15,9 @@ setup(
     platforms='any',
     install_requires=[
         'sqlalchemy',
-        'opentracing>=1.1,<=1.3'
+        'opentracing'
     ],
+    tests_require=['pytest-cov'],
     classifiers=[
         'Intended Audience :: Developers',
         'License :: OSI Approved :: BSD License',
